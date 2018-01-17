@@ -12,6 +12,7 @@ Processes a sequence of words attaching part of speech tags to each word.
     ('to', 'TO'), ('obtain', 'VB'), ('the', 'DT'), ('refuse', 'NN'), ('permit', 'NN')]
 
 In NLKT first we tokenize the text and then tag it.
+***
 
 ## Tagged Corpora
 
@@ -31,6 +32,7 @@ In NLKT first we tokenize the text and then tag it.
 | VERB | verb                | is, say, told, given, playing, would   |
 | .    | punctuation marks   | . , ; !                                |
 | X    | other               | ersatz, esprit, dunno, gr8, univeristy |
+***
 
 ## Automatic Tagging
 
@@ -69,6 +71,7 @@ First let's find the most frequent words and save their most likely tags (from a
 5. Now use this as a model for the UnigramTagger.
 
 This tagger yields an accuracy of ~45%.
+***
 
 ## N-Gram Tagging
 
@@ -80,3 +83,70 @@ The process to train is simple: provide tagged sentences data as a parameter whe
 ### Separating Training and Testing Data
 
 The data used to train the tagger can't be the same to test the tagger. Otherwise the tagger will just "memorize" it all and do great on the testing. Hence the data should be split with some proportion such as 90% for training and 10% for testing.
+
+### General N-Gram Tagging
+
+In Unigram Tagging only the word to be tagged is used as a parameter for the tagging, the word is the only piece of context that's used.
+
+The context of a N-Gram tagger is the current word together with the N-1 POS-tags that came before it. For example, if we're using a 4-gram tagger, the curret word is *car* and the last 3 POS-tags were PRON, VERB, DET then PRON, VERB, DET and car will be used to tag *car*.
+
+### Combining Taggers
+
+N-Gram taggers can be combined to get a satisfactory result. For example, a Default Tagger can be used in the begginig, then a UnigramTagger with the DefaultTagger as backoff then a BigramTagger with the UnigramTagger as backoff, etc..
+
+### Unknown words
+
+In this situation a special tag "UNK" should be used so the taggers can learn how to deal with it. For example: in the beggining the tagger would probably tag UNK as nouns but if it has a the word "to" before it then it would likely be tagged as a verb (i.e. "the blog" and "to blog", the same unknown word should be tagged differently).
+
+### Storing Taggers
+
+Tagging can take a significant amout of time depending on the input. It's possible to store them and rapidly recover the with *prickle*:
+
+```python
+from pickle import dump
+output = open('POS-Tagger.pkl', 'wb')
+dump(pos_tagger, output, -1)
+output.close()
+```
+
+To get it back:
+
+```python
+from pickle import load
+input = open('POS-tagger.pkl', 'rb')
+pos_tagger = load(input)
+input.close()
+```
+
+***
+
+## Transformation-Based Tagging
+
+A a few issues can be found in n-gram tagging: the size of the n-gram's table, and the lack of context. And approach appointed 
+to solve these issues is called Brill tagging or *transformation-based learning*.
+
+The idea of this kind of tagging is quite simple: guess the tag of every word, then go back and fix the mistakes. With n-gram we use *supervised learning* since we use some data to train the tagger, with Brill Tagging instead of counting observations a list of transformational correction rules are used.
+
+We can use a unigram tag to first guess the tags of the words and then apply a set of rules such as (a) Replace NN with VB when the previous word is TO; (b) Replace TO with IN when the next tag is NNS. Let's se an example:
+
+|             |     |          |        |     |        |     |            |                |
+| ----------- | --- | -------- | ------ | --- | ------ | --- | ---------- | -------------- |
+| **Phrase**  | to  | increase | grants | to  | states | for | vocational | rehabilitation |
+| **Unigram** | TO  | NN       | NNS    | TO  | NNS    | IN  | JJ         | NN             |
+| **Rule 1**  |     | VB       |        |     |        |     |            |                |
+| **Rule 2**  |     |          |        | IN  |        |     |            |                |
+| **Output**  | TO  | VB       | NNS    | IN  | NNS    | IN  | JJ         | NN             |
+| **Gold**    | TO  | VB       | NNS    | IN  | NNS    | IN  | JJ         | NN             |
+
+All the rules in Brill Tagging are of the following type:
+Replace T1 with T2 in context C
+Usually the context depends on following or previous word.
+***
+
+## Summary
+
+* Words can be grouped into classes, such as nouns, verbs, adjectives, and adverbs. These classes are known as lexical categories or parts of speech. Parts of speech are assigned short labels, or tags, such as NN, VB.
+* Backoff is a method for combining models: when a more specialized model (such as a bigram tagger) cannot assign a tag in a given context, we backoff to a more general model (such as a unigram tagger).
+* Part-of-speech tagging is an important, early example of a sequence classification task in NLP: a classification decision at any one point in the sequence makes use of words and tags in the local context.
+* N-gram taggers can be defined for large values of n, but once n is larger than 3 we usually encounter the sparse data problem; even with a large quantity of training data we only see a tiny fraction of possible contexts.
+* Transformation-based tagging involves learning a series of repair rules of the form "change tag s to tag t in context c", where each rule fixes mistakes and possibly introduces a (smaller) number of errors.
